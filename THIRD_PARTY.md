@@ -24,6 +24,9 @@ licenses continue to apply to those components.
 
 ## Wallpapers
 
-No wallpapers, Workshop projects, thumbnails or personal settings are included.
+No original wallpaper files, Workshop projects or personal settings are included.
+The documentation screenshots contain reduced previews from an example library
+solely to demonstrate the selector. Those images belong to their respective
+authors; the project's GPL license does not relicense the depicted artwork.
 Images shown locally come from each user's existing Waywallen library and remain
 subject to their original authors' licenses.

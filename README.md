@@ -3,6 +3,20 @@
 Un selector minimalista de wallpapers para **KDE Plasma y Waywallen**: tarjetas
 diagonales en un carrusel flotante, sin panel, botones ni textos sobre las imágenes.
 
+## Capturas
+
+### Vista general
+
+![Carrusel de wallpapers con tarjetas diagonales y selección resaltada en morado](docs/screenshots/carousel.png)
+
+### Detalle de las tarjetas
+
+![Detalle ampliado del centro del carrusel y de la tarjeta seleccionada](docs/screenshots/carousel-detail.png)
+
+Captura real del selector; la segunda imagen es un recorte de la primera.
+Los wallpapers mostrados pertenecen a sus respectivos autores y no se distribuyen
+como fondos instalables con el proyecto.
+
 ## Características
 
 - Miniaturas estáticas de tu biblioteca existente, sin iniciar nuevos renderizadores.
