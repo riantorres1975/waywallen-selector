@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Wire-compatible subset of Waywallen v0.5.0 proto/control.proto (GPL-3.0).
+// Opaque settings fields are deliberately round-tripped, never reconstructed.
+syntax = "proto3";
+package selectorwire;
+message Empty {}
+message Request {
+  uint64 request_id = 1;
+  oneof payload {
+    WallpaperApplyRequest wallpaper_apply = 22;
+    Empty display_list = 23;
+    Empty settings_get = 24;
+    SettingsSetRequest settings_set = 25;
+  }
+}
+message ServerFrame { Response response = 1; }
+message Response {
+  uint64 request_id = 1;
+  int32 status = 2;
+  string message = 3;
+  int32 error_code = 4;
+  oneof payload {
+    WallpaperApplyResponse wallpaper_apply = 22;
+    DisplayListResponse display_list = 23;
+    SettingsGetResponse settings_get = 24;
+    Empty settings_set = 25;
+  }
+}
+message PresentationTarget {
+  oneof target { uint64 display_id = 1; string canvas_id = 2; }
+}
+message WallpaperApplyRequest {
+  string wallpaper_id = 1;
+  repeated PresentationTarget targets = 5;
+}
+message WallpaperApplyResponse {
+  string renderer_id = 1;
+  string wallpaper_id = 2;
+  bool deferred = 5;
+}
+message DisplayInfo {
+  uint64 display_id = 1;
+  string name = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+  string alias = 11;
+  string settings_key = 16;
+  string canvas_id = 17;
+  bool selectable_target = 20;
+}
+message DisplayListResponse { repeated DisplayInfo displays = 1; }
+message TransitionConfig {
+  int32 kind = 1;
+  uint32 duration_ms = 2;
+  uint32 angle = 3;
+  uint32 origin_x = 4;
+  uint32 origin_y = 5;
+}
+// Every unmodelled global setting remains in protobuf's UnknownFieldSet.
+message GlobalSettings { TransitionConfig transition = 28; }
+// Map entries are length-delimited messages too: keeping their raw bytes
+// preserves all plugin options, including options added by newer versions.
+message SettingsGetResponse { bytes global = 1; repeated bytes plugins = 2; }
+message SettingsSetRequest { bytes global = 1; repeated bytes plugins = 2; }

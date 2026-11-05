@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Waywallen Selector
+Name[es]=Selector de wallpapers
+Comment=Minimal wallpaper carousel for Waywallen
+Comment[es]=Carrusel minimalista de fondos animados para Waywallen
+Exec="@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/waywallen-selector"
+Icon=preferences-desktop-wallpaper
+Terminal=false
+StartupNotify=false
+Categories=Settings;DesktopSettings;
+StartupWMClass=org.local.WaywallenSelector
+X-KDE-Shortcuts=Meta+Alt+W

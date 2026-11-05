@@ -1,0 +1,31 @@
+# Out-of-tree builds, generated protocol sources and local IDE files.
+/build*/
+/cmake-build*/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/install_manifest.txt
+/CTestTestfile.cmake
+/Testing/
+/.qt/
+/.cache/
+/.idea/
+/.vscode/
+*.o
+*.a
+*.so
+*.pb.cc
+*.pb.h
+*.log
+
+# Never publish local state, credentials or wallpaper libraries.
+.env
+.env.*
+*.pem
+*.key
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+/wallpapers/
+/backups/
