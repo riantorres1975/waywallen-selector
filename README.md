@@ -23,6 +23,7 @@ como fondos instalables con el proyecto.
 - Fondos ordenados por fecha de incorporación: del más reciente al más antiguo.
 - Navegación con teclado, rueda o arrastre; clic o Enter para aplicar.
 - Transición nativa de Waywallen y opción interna de acento automático de Plasma.
+- Paleta del wallpaper para KDE/Plasma, Dolphin/Kvantum, Kitty, Btop, Cava, bordes y Vesktop, con respaldo y restauración.
 - Destino explícito por monitor: nunca se aplica un fondo a todas las pantallas por omisión.
 - Ventana de tamaño fijo, compatible con el mosaico de Krohnkite sin recargarlo.
 - Instancia única: el mismo atajo abre y cierra el selector.
@@ -47,7 +48,7 @@ soportados por esta versión. Las entradas ocultas o cuyos archivos faltan se om
 Dependencias orientativas en Arch Linux/CachyOS:
 
 ```bash
-sudo pacman -S --needed base-devel cmake qt6-base qt6-declarative qt6-websockets qt6-wayland kconfig protobuf
+sudo pacman -S --needed base-devel cmake qt6-base qt6-declarative qt6-websockets qt6-wayland kconfig protobuf python python-pillow
 ```
 
 Clona el repositorio y compila:
@@ -66,6 +67,8 @@ La instalación no necesita `sudo`: añade el ejecutable a `~/.local/bin` y los
 lanzadores a `~/.local/share/applications` y `~/.local/share/kglobalaccel`.
 No sobrescribe configuraciones de KWin, KDE, terminales o Waywallen.
 Los archivos de una instalación anterior de **este selector** se reemplazan.
+Los colores de las aplicaciones solo se modifican al confirmar un fondo con la
+opción `automaticAppColors` activada.
 
 Puedes probarlo sin instalar usando `build/waywallen-selector`.
 
@@ -74,7 +77,7 @@ Puedes probarlo sin instalar usando `build/waywallen-selector`.
 | Acción | Control |
 |---|---|
 | Abrir/cerrar | **Win + Alt + W** |
-| Navegar | **← / →**, rueda o arrastrar |
+| Navegar | **← / →**, rueda vertical/horizontal, touchpad o arrastrar |
 | Aplicar | **Clic en una imagen** o **Enter** |
 | Cerrar sin cambiar el fondo | **Esc** |
 
@@ -94,16 +97,72 @@ Se guardan en `~/.config/local.desktop/WaywallenSelector.conf`:
 [appearance]
 transition=1
 automaticAccent=true
+automaticAppColors=false
 ```
 
 `transition`: `0` sin transición, `1` fundido, `2` barrido, `3` expansión.
 La duración es de 500 ms. Estas opciones se aplican **solo al confirmar** un fondo.
 
 `automaticAccent` activa el acento nativo de Plasma y la integración de Waywallen.
-No cambia fuentes, iconos, estilos, BTree, bordes personalizados ni los temas de
-Kitty/Btop/Vesktop. El acento es global: Plasma decide qué pantalla usa para obtenerlo.
+Por sí sola no cambia los temas de las aplicaciones. El acento es global:
+Plasma decide qué pantalla usa para obtenerlo.
 Poner esta preferencia en `false` evita activarlo; no desactiva una opción que ya
 se hubiera habilitado en Plasma.
+
+### Colores de las aplicaciones
+
+Requiere **Python 3.10+, Pillow y Matugen 4.x** (`sudo pacman -S --needed python python-pillow matugen`).
+Activa `automaticAppColors=true` en el archivo anterior, con el selector cerrado.
+
+Al confirmar un wallpaper se toma su color de escena personalizado, si está definido
+y no es gris. En los demás casos se extrae el acento cromático de la **miniatura**, sin
+dejar que las zonas grises o los tonos de piel apagados dominen la elección.
+Los fondos de las ventanas permanecen en **gris carbón**, sin el lavado marrón de
+los neutros cálidos de Material You.
+
+- **KDE/Plasma:** esquema nativo, selecciones, menús, bandeja, Andromeda y centro de control.
+- **Dolphin/Kvantum:** variantes de Sweet-Blur con las mismas formas, transparencias y desenfoque.
+- **Kitty:** fondo, texto, selección y acentos; conserva los colores de aviso rojo/verde/amarillo.
+- **Btop:** tema `Waywallen`, sin reemplazar el tema original ni alterar la transparencia.
+- **Cava:** degradado basado en la paleta, sin cambiar la captura de audio.
+- **KWin:** bordes activos e inactivos y recarga inmediata del efecto Round Corners.
+- **Vesktop Flatpak:** QuickCSS con acentos, texto, fondo y popups; conserva su opacidad.
+
+Solo se ajustan las aplicaciones que ya tengan configuración compatible. No se
+cambian fuentes, geometría, atajos, BTree, iconos ni los logotipos de las aplicaciones.
+Plasma y Kvantum usan copias locales alternas de los temas instalados; los originales
+no se modifican. Alternar las copias evita que se reutilicen imágenes con colores viejos.
+Con esta opción activa, el esquema generado es la única fuente del acento: no compite
+con la extracción automática nativa de Plasma.
+
+La actualización avisa a KDE y al efecto de bordes por sus interfaces de recarga.
+Dolphin recrea su estilo Kvantum en vivo, sin cerrar sus ventanas ni cambiar el estilo
+global de las demás aplicaciones. Kitty, Btop y Cava reciben su señal de recarga si
+la admiten; Vesktop conserva la recarga habitual de QuickCSS.
+No se reinician aplicaciones, Plasma, KWin ni Krohnkite.
+
+La generación sucede **una vez al elegir el fondo**, no al recorrer las tarjetas.
+No hay un servicio vigilando cambios: los fondos cambiados fuera del selector no
+actualizan estos colores. En vídeos/escenas se utiliza la miniatura, no cada fotograma.
+
+Los archivos originales quedan en
+`~/.local/state/waywallen-selector/colors/backup.json` (o bajo `$XDG_STATE_HOME`).
+Para restaurarlos y desactivar esta opción:
+
+```bash
+waywallen-selector --restore-colors
+```
+
+La restauración conserva los ajustes ajenos a los colores y se detiene si un color
+administrado fue editado después, para no perder cambios nuevos.
+Si Matugen falla, el wallpaper se conserva y el selector
+muestra el error sin cerrarse automáticamente.
+
+Para revisar la paleta y los archivos previstos sin modificarlos:
+
+```bash
+python3 tools/color_sync.py --image /ruta/a/miniatura.png --dry-run
+```
 
 ## Comprobaciones sin cambiar el fondo
 

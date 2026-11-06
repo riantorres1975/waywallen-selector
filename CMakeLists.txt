@@ -8,12 +8,12 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Quick Qml DBus Sql WebSockets 
 find_package(KF6Config REQUIRED)
 find_package(Protobuf REQUIRED)
 protobuf_generate_cpp(PROTO_SOURCES PROTO_HEADERS protocol.proto)
-qt_add_executable(waywallen-selector main.cpp backend.cpp backend.h slantedpreview.cpp slantedpreview.h ${PROTO_SOURCES})
+qt_add_executable(waywallen-selector main.cpp backend.cpp backend.h slantedpreview.cpp slantedpreview.h appearance_reload.cpp appearance_reload.h ${PROTO_SOURCES})
 target_include_directories(waywallen-selector PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(waywallen-selector PRIVATE Qt6::Quick Qt6::Qml Qt6::DBus Qt6::Sql Qt6::WebSockets Qt6::Concurrent KF6::ConfigCore protobuf::libprotobuf)
-qt_add_resources(waywallen-selector "ui" PREFIX "/" FILES Main.qml)
+qt_add_resources(waywallen-selector "selector_ui" PREFIX "/" FILES Main.qml tools/color_sync.py)
 configure_file(packaging/org.local.WaywallenSelector.desktop.in org.local.WaywallenSelector.desktop @ONLY)
-install(TARGETS waywallen-selector RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS waywallen-selector RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.local.WaywallenSelector.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.local.WaywallenSelector.desktop
@@ -21,8 +21,32 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/org.local.WaywallenSelector.desktop
 install(FILES LICENSE THIRD_PARTY.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/waywallen-selector)
 include(CTest)
 if(BUILD_TESTING)
+    find_package(Qt6 6.8 REQUIRED COMPONENTS Test)
     add_executable(protocol-test protocol_test.cpp ${PROTO_SOURCES})
     target_include_directories(protocol-test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_link_libraries(protocol-test PRIVATE protobuf::libprotobuf)
     add_test(NAME settings-preservation-and-monitor-target COMMAND protocol-test)
+    qt_add_executable(ui-test ui_test.cpp slantedpreview.cpp slantedpreview.h)
+    target_link_libraries(ui-test PRIVATE Qt6::Quick Qt6::Qml Qt6::Concurrent Qt6::Test)
+    qt_add_resources(ui-test "test_ui" PREFIX "/" FILES Main.qml)
+    add_test(NAME carousel-input COMMAND ui-test)
+    set_tests_properties(carousel-input PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+    find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME application-colors COMMAND ${Python3_EXECUTABLE}
+        -m unittest discover -s tests -v)
+    set_tests_properties(application-colors PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
+    add_test(NAME color-helper-resource COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_smoke.py" $<TARGET_FILE:waywallen-selector>)
+    find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets)
+    find_program(DBUS_RUN_SESSION dbus-run-session)
+    if(DBUS_RUN_SESSION)
+        qt_add_executable(appearance-test appearance_test.cpp)
+        target_link_libraries(appearance-test PRIVATE Qt6::Widgets Qt6::DBus Qt6::Test KF6::ConfigCore)
+        add_test(NAME native-appearance-reload COMMAND ${DBUS_RUN_SESSION} -- $<TARGET_FILE:appearance-test>)
+        set_tests_properties(native-appearance-reload PROPERTIES ENVIRONMENT
+            "QT_QPA_PLATFORM=offscreen;QT_STYLE_OVERRIDE=kvantum;SELECTOR_TEST_BINARY=$<TARGET_FILE:waywallen-selector>")
+    endif()
 endif()

@@ -13,6 +13,11 @@
 #include <QSqlQuery>
 #include <QTimer>
 #include <QSet>
+#include <QFile>
+#include <QProcess>
+#include <QStandardPaths>
+#include <QCoreApplication>
+#include <QProcessEnvironment>
 #include <KSharedConfig>
 #include <KConfigGroup>
 
@@ -208,7 +213,7 @@ void Backend::receive(const QByteArray &data) {
     callback(response);
 }
 
-void Backend::apply(const QString &id, int transition, bool accent) {
+void Backend::apply(const QString &id, int transition, bool accent, bool appColors) {
     if (m_previewOnly || !m_ready || m_busy || m_targetIndex < 0 || m_targetIndex >= m_displays.size()) return;
     bool known = false;
     for (const auto &item : m_all) if (item.toMap()["id"].toString() == id) known = true;
@@ -220,7 +225,7 @@ void Backend::apply(const QString &id, int transition, bool accent) {
     emit errorChanged();
     selectorwire::Request get;
     get.mutable_settings_get();
-    request(get, [this, id, target, transition, accent](const selectorwire::Response &response) {
+    request(get, [this, id, target, transition, accent, appColors](const selectorwire::Response &response) {
         if (!response.has_settings_get()) { fail("Respuesta de configuración no compatible."); return; }
         const auto &settings = response.settings_get();
         selectorwire::GlobalSettings global;
@@ -234,24 +239,81 @@ void Backend::apply(const QString &id, int transition, bool accent) {
         selectorwire::Request set;
         set.mutable_settings_set()->set_global(global.SerializeAsString());
         for (const auto &plugin : settings.plugins()) set.mutable_settings_set()->add_plugins(plugin);
-        request(set, [this, id, target, accent](const selectorwire::Response &) {
+        request(set, [this, id, target, accent, appColors](const selectorwire::Response &) {
             selectorwire::Request apply;
             apply.mutable_wallpaper_apply()->set_wallpaper_id(id.toStdString());
             auto *destination = apply.mutable_wallpaper_apply()->add_targets();
             if (!target["canvas"].toString().isEmpty()) destination->set_canvas_id(target["canvas"].toString().toStdString());
             else destination->set_display_id(target["id"].toString().toULongLong());
-            request(apply, [this, id, target, accent](const selectorwire::Response &response) {
+            request(apply, [this, id, target, accent, appColors](const selectorwire::Response &response) {
                 if (!response.has_wallpaper_apply()) { fail("Waywallen no confirmó el cambio de fondo."); return; }
                 QSettings().setValue("targetKey", target["key"]);
-                if (accent) enableAccent();
+                // Full palette sync owns the accent; do not race the native
+                // thumbnail-based provider against the generated scheme.
+                if (accent && !appColors) enableAccent();
                 m_currentId = id;
-                m_busy = false;
                 emit currentIdChanged();
-                emit stateChanged();
-                emit applied();
+                auto finished = [this] {
+                    m_busy = false;
+                    emit stateChanged();
+                    emit applied();
+                };
+                if (appColors) syncColors(id, finished);
+                else finished();
             });
         });
     });
+}
+
+void Backend::syncColors(const QString &id, std::function<void()> finished) {
+    QString preview;
+    for (const auto &item : m_all) {
+        const auto map = item.toMap();
+        if (map["id"].toString() == id) {
+            preview = QUrl(map["preview"].toString()).toLocalFile();
+            break;
+        }
+    }
+    auto warn = [this](const QString &detail) {
+        m_error = "El fondo cambió, pero no se pudieron sincronizar los colores. " + detail;
+        emit errorChanged();
+        emit appearanceWarning(m_error);
+    };
+    QFile helper(":/tools/color_sync.py");
+    const QString python = QStandardPaths::findExecutable("python3");
+    if (preview.isEmpty() || python.isEmpty() || !helper.open(QIODevice::ReadOnly)) {
+        warn("Se necesita Python 3 y una miniatura disponible.");
+        finished();
+        return;
+    }
+    auto *process = new QProcess(this);
+    auto *timeout = new QTimer(process);
+    timeout->setSingleShot(true);
+    connect(timeout, &QTimer::timeout, process, [process] {
+        process->setProperty("timedOut", true);
+        process->kill();
+    });
+    connect(process, &QProcess::errorOccurred, this,
+            [process, warn, finished](QProcess::ProcessError error) {
+        if (error != QProcess::FailedToStart) return;
+        warn("No se pudo iniciar Python 3.");
+        finished();
+        process->deleteLater();
+    });
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [process, warn, finished](int code, QProcess::ExitStatus status) {
+        if (code != 0 || status != QProcess::NormalExit) {
+            warn(process->property("timedOut").toBool() ? "La generación tardó demasiado."
+                 : QString::fromUtf8(process->readAllStandardError()).trimmed().left(600));
+        }
+        finished();
+        process->deleteLater();
+    });
+    auto environment = QProcessEnvironment::systemEnvironment();
+    environment.insert("WAYWALLEN_SELECTOR_BINARY", QCoreApplication::applicationFilePath());
+    process->setProcessEnvironment(environment);
+    process->start(python, {"-c", QString::fromUtf8(helper.readAll()), "--image", preview, "--wallpaper-id", id});
+    timeout->start(55000);
 }
 
 void Backend::enableAccent() {
@@ -270,7 +332,8 @@ void Backend::enableAccent() {
         QDBusPendingReply<QString> reply = *watcher;
         if (reply.isError() || reply.value().trimmed() == "0") {
             const QString message = "El fondo cambió, pero no se pudo activar el acento automático de Plasma.";
-            fail(message);
+            m_error = message;
+            emit errorChanged();
             emit accentWarning(message);
         }
         watcher->deleteLater();

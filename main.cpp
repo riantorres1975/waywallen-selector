@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "backend.h"
 #include "slantedpreview.h"
+#include "appearance_reload.h"
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -16,6 +17,11 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QFileInfo>
+#include <QFile>
+#include <QProcess>
+#include <QProcessEnvironment>
+#include <QStandardPaths>
+#include <QSettings>
 
 class WindowControl : public QObject {
     Q_OBJECT
@@ -40,9 +46,36 @@ int main(int argc, char **argv) {
     parser.addHelpOption();
     parser.addOption({"diagnose", "Check library and daemon without changing anything."});
     parser.addOption({"capture", "Save an image of the selector only and exit (no wallpaper is changed).", "file"});
+    parser.addOption({"restore-colors", "Restore the application colors saved before the first color sync."});
+    parser.addOption({"reload-appearance", "Publish live KDE palette, Plasma, Kvantum and border changes (no wallpaper change).", "parts"});
     parser.process(app);
     const bool diagnose = parser.isSet("diagnose");
     const bool capture = parser.isSet("capture");
+    if (parser.isSet("reload-appearance")) {
+        if (capture || diagnose || parser.isSet("restore-colors")) parser.showHelp(1);
+        const auto parts = parser.value("reload-appearance").split(',');
+        for (const auto &part : parts)
+            if (!QStringList{"palette", "plasma", "kvantum", "borders"}.contains(part)) return 1;
+        const auto warnings = reloadAppearance(parts);
+        if (!warnings.isEmpty()) QTextStream(stderr) << warnings.join('\n') << '\n';
+        return warnings.isEmpty() ? 0 : 1;
+    }
+    if (parser.isSet("restore-colors")) {
+        if (capture || diagnose) parser.showHelp(1);
+        QFile helper(":/tools/color_sync.py");
+        const QString python = QStandardPaths::findExecutable("python3");
+        if (python.isEmpty() || !helper.open(QIODevice::ReadOnly)) return 1;
+        QProcess restore;
+        auto environment = QProcessEnvironment::systemEnvironment();
+        environment.insert("WAYWALLEN_SELECTOR_BINARY", QCoreApplication::applicationFilePath());
+        restore.setProcessEnvironment(environment);
+        restore.setProcessChannelMode(QProcess::ForwardedChannels);
+        restore.start(python, {"-c", QString::fromUtf8(helper.readAll()), "--restore"});
+        if (!restore.waitForFinished(45000)) return 1;
+        const int code = restore.exitStatus() == QProcess::NormalExit ? restore.exitCode() : 1;
+        if (code == 0) QSettings().setValue("appearance/automaticAppColors", false);
+        return code;
+    }
     const QString service = "org.local.WaywallenSelector";
     WindowControl control;
     if (!diagnose && !capture) {

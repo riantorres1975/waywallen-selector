@@ -29,3 +29,5 @@
 *.sqlite3
 /wallpapers/
 /backups/
+__pycache__/
+*.pyc

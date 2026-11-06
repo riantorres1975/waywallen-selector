@@ -13,8 +13,12 @@ Window {
     color: "transparent"
     flags: Qt.Tool | Qt.FramelessWindowHint
     property bool appliedOnce: false
-    readonly property var selection: gallery.count > 0 && gallery.currentItem
-                                    ? gallery.currentItem.modelData : null
+    property real wheelRemainder: 0
+    property bool wheelUsesPixels: false
+    // Read the model directly: currentItem can lag behind currentIndex while
+    // PathView animates, especially when Enter follows a wheel/key event.
+    readonly property var selection: gallery.currentIndex >= 0 && gallery.currentIndex < gallery.count
+                                    ? selector.wallpapers[gallery.currentIndex] : null
 
     // Keep the previously chosen behavior, without displaying settings.
     Settings {
@@ -22,17 +26,45 @@ Window {
         category: "appearance"
         property int transition: 1
         property bool automaticAccent: true
+        property bool automaticAppColors: false
     }
 
     function confirm(id) {
         const chosen = id || (selection ? selection.id : "")
         if (chosen && selector.ready && !selector.busy && !appliedOnce)
-            selector.apply(chosen, preferences.transition, preferences.automaticAccent)
+            selector.apply(chosen, preferences.transition, preferences.automaticAccent,
+                           preferences.automaticAppColors)
     }
     function step(delta) {
         if (gallery.count > 0)
             gallery.currentIndex = ((gallery.currentIndex + delta) % gallery.count + gallery.count) % gallery.count
     }
+    function scroll(event) {
+        // Own wheel input across the whole window, including the gaps between
+        // cards. No mouse buttons are grabbed, so clicks and dragging still work.
+        event.accepted = true
+        if (selector.busy || appliedOnce || gallery.count === 0) {
+            wheelRemainder = 0
+            return
+        }
+        const pixels = event.pixelDelta.x !== 0 || event.pixelDelta.y !== 0
+        const delta = pixels ? event.pixelDelta : event.angleDelta
+        const amount = Math.abs(delta.y) >= Math.abs(delta.x) ? delta.y : delta.x
+        if (amount === 0)
+            return
+        if (pixels !== wheelUsesPixels || wheelRemainder * amount < 0)
+            wheelRemainder = 0
+        wheelUsesPixels = pixels
+        wheelRemainder += amount
+        const threshold = pixels ? 60 : 120
+        const steps = Math.trunc(wheelRemainder / threshold)
+        if (steps !== 0) {
+            step(-steps)
+            wheelRemainder -= steps * threshold
+        }
+        wheelReset.restart()
+    }
+    Timer { id: wheelReset; interval: 200; onTriggered: root.wheelRemainder = 0 }
     function showNewest() {
         // Start with the first recent cards visible from left to right,
         // rather than wrapping the oldest entries into the initial view.
@@ -43,6 +75,7 @@ Window {
 
     PathView {
         id: gallery
+        objectName: "gallery"
         anchors.fill: parent
         anchors.margins: 5
         clip: true
@@ -59,14 +92,6 @@ Window {
         interactive: !selector.busy
         readonly property real cardWidth: Math.min(360, width / (root.width > 1400 ? 5.2 : 3.6))
 
-        WheelHandler {
-            onWheel: function(event) {
-                if (!selector.busy && event.angleDelta.y !== 0) {
-                    root.step(event.angleDelta.y > 0 ? -1 : 1)
-                    event.accepted = true
-                }
-            }
-        }
         path: Path {
             startX: -gallery.cardWidth * 0.15
             startY: gallery.height / 2
@@ -108,6 +133,14 @@ Window {
         }
     }
 
+    MouseArea {
+        anchors.fill: parent
+        z: 100
+        acceptedButtons: Qt.NoButton
+        scrollGestureEnabled: true
+        onWheel: function(event) { root.scroll(event) }
+    }
+
     // Only failures get a message; the normal interface is images only.
     Rectangle {
         anchors.centerIn: parent
@@ -131,8 +164,13 @@ Window {
     Connections {
         target: selector
         function onWallpapersChanged() { root.showNewest() }
-        function onApplied() { root.appliedOnce = true; closeAfterApply.start() }
+        function onApplied() {
+            root.appliedOnce = true
+            if (selector.error.length === 0)
+                closeAfterApply.start()
+        }
         function onAccentWarning(message) { closeAfterApply.stop(); console.warn(message) }
+        function onAppearanceWarning(message) { closeAfterApply.stop(); console.warn(message) }
     }
     Timer { id: closeAfterApply; interval: 600; onTriggered: root.close() }
     Shortcut { sequence: "Escape"; enabled: !selector.busy; onActivated: root.close() }

@@ -34,7 +34,7 @@ public:
     void setSearch(const QString &value);
     void setTargetIndex(int index);
     void preferScreen(const QString &model);
-    Q_INVOKABLE void apply(const QString &id, int transition, bool accent);
+    Q_INVOKABLE void apply(const QString &id, int transition, bool accent, bool appColors = false);
 signals:
     void wallpapersChanged();
     void displaysChanged();
@@ -45,6 +45,7 @@ signals:
     void currentIdChanged();
     void applied();
     void accentWarning(const QString &message);
+    void appearanceWarning(const QString &message);
 private:
     using Callback = std::function<void(const selectorwire::Response &)>;
     void loadLibrary();
@@ -53,6 +54,7 @@ private:
     void request(selectorwire::Request req, Callback callback);
     void fail(const QString &message);
     void enableAccent();
+    void syncColors(const QString &id, std::function<void()> finished);
     QVariantList m_all, m_filtered, m_displays;
     QString m_search, m_error, m_currentId, m_screenModel;
     QWebSocket m_socket;
