@@ -65,6 +65,15 @@ Window {
         wheelReset.restart()
     }
     Timer { id: wheelReset; interval: 200; onTriggered: root.wheelRemainder = 0 }
+    function jumpTo(index) {
+        // Restore before mapping the window, without animating across the
+        // library. Only explicit navigation should use the normal animation.
+        const duration = gallery.highlightMoveDuration
+        gallery.highlightMoveDuration = 0
+        gallery.currentIndex = index
+        gallery.positionViewAtIndex(index, PathView.SnapPosition)
+        gallery.highlightMoveDuration = duration
+    }
     function restoreSelection() {
         if (gallery.count === 0)
             return
@@ -73,13 +82,13 @@ Window {
         const chosen = selector.initialWallpaperId
         for (let i = 0; i < gallery.count; ++i) {
             if (selector.wallpapers[i].id === chosen) {
-                gallery.currentIndex = i
+                jumpTo(i)
                 return
             }
         }
         // First run, removed wallpaper, or filtered out: show the recent cards.
-        gallery.currentIndex = Math.max(0, Math.min(gallery.count - 1,
-                                                   Math.floor(gallery.pathItemCount / 2)))
+        jumpTo(Math.max(0, Math.min(gallery.count - 1,
+                                   Math.floor(gallery.pathItemCount / 2))))
     }
     Component.onCompleted: restoreSelection()
 

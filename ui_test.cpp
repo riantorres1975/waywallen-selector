@@ -51,15 +51,21 @@ class CarouselInputTest : public QObject {
         QVERIFY(!engine->rootObjects().isEmpty());
         window = qobject_cast<QQuickWindow *>(engine->rootObjects().first());
         QVERIFY(window);
+        gallery = window->findChild<QQuickItem *>("gallery");
+        QVERIFY(gallery);
+        // Opening must be settled before the window is mapped, not eventually
+        // correct after an animation through every intervening wallpaper.
+        QCOMPARE(gallery->property("currentIndex").toInt(), expectedIndex);
+        const int count = selector->wallpapers.size();
+        const double expectedOffset = count > 0 ? double((count - expectedIndex) % count) : 0.0;
+        QCOMPARE(gallery->property("offset").toReal(), expectedOffset);
+        QVERIFY(!gallery->property("moving").toBool());
         window->show();
         window->requestActivate();
         QVERIFY(QTest::qWaitForWindowExposed(window));
-        gallery = window->findChild<QQuickItem *>("gallery");
-        QVERIFY(gallery);
         QTRY_COMPARE(gallery->property("currentIndex").toInt(), expectedIndex);
-        const int count = selector->wallpapers.size();
         if (count > 0)
-            QTRY_COMPARE(gallery->property("offset").toReal(), double((count - expectedIndex) % count));
+            QCOMPARE(gallery->property("offset").toReal(), expectedOffset);
     }
     void reopenWindow(int expectedIndex) {
         gallery = nullptr;
@@ -153,6 +159,30 @@ private slots:
         QCOMPARE(gallery->property("currentIndex").toInt(), 9);
         QTest::keyClick(window, Qt::Key_Return);
         QCOMPARE(selector->appliedId, QString("9"));
+    }
+    void distantWallpaperOpensWithoutTravelling() {
+        selector->wallpapers.clear();
+        for (int i = 0; i < 500; ++i)
+            selector->wallpapers.append(QVariantMap{{"id", QString::number(i)},
+                {"title", QString::number(i)}, {"preview", ""}});
+        selector->initialWallpaperId = "347";
+        reopenWindow(347);
+        QSignalSpy offsets(gallery, SIGNAL(offsetChanged()));
+        QTest::qWait(300);
+        QCOMPARE(offsets.count(), 0);
+        QCOMPARE(gallery->property("offset").toReal(), 153.0);
+        QVERIFY(selector->appliedId.isEmpty());
+    }
+    void navigationStillAnimates() {
+        QTRY_VERIFY(window->isActive());
+        QCOMPARE(gallery->property("highlightMoveDuration").toInt(), 230);
+        QSignalSpy offsets(gallery, SIGNAL(offsetChanged()));
+        QTest::keyClick(window, Qt::Key_Right);
+        QCOMPARE(gallery->property("currentIndex").toInt(), 4);
+        QVERIFY(gallery->property("offset").toReal() != 8.0);
+        QTRY_COMPARE(gallery->property("offset").toReal(), 8.0);
+        QVERIFY(offsets.count() > 1);
+        QVERIFY(selector->appliedId.isEmpty());
     }
     void newImportsDoNotChangeRememberedWallpaper() {
         selector->initialWallpaperId = "9";

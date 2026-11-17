@@ -93,7 +93,8 @@ solo las miniaturas del carrusel son estáticas. El tamaño de la franja se adap
 a la pantalla, hasta 1800 × 460 píxeles lógicos.
 
 La posición se recuerda por el ID del último wallpaper aplicado correctamente,
-no por su número de tarjeta. Navegar y salir con Esc no cambia ese recuerdo.
+no por su número de tarjeta. Aparece directamente centrado, sin animar el recorrido
+desde el inicio; la navegación conserva su animación. Navegar y salir con Esc no cambia ese recuerdo.
 Si ya no está disponible, se centra el fondo actual de Waywallen; si tampoco está,
 se muestran los más recientes. Abrir el selector no vuelve a aplicar el wallpaper.
 
