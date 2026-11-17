@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Wire-compatible subset of Waywallen v0.5.0 proto/control.proto (GPL-3.0).
+// Wire-compatible subset of Waywallen v0.5.0/v0.6.0 proto/control.proto (GPL-3.0).
 // Opaque settings fields are deliberately round-tripped, never reconstructed.
 syntax = "proto3";
 package selectorwire;
@@ -47,6 +47,7 @@ message DisplayInfo {
   string settings_key = 16;
   string canvas_id = 17;
   bool selectable_target = 20;
+  int32 role = 25; // 0 = desktop (protobuf default), 1 = lock screen.
 }
 message DisplayListResponse { repeated DisplayInfo displays = 1; }
 message TransitionConfig {

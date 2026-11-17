@@ -65,13 +65,23 @@ Window {
         wheelReset.restart()
     }
     Timer { id: wheelReset; interval: 200; onTriggered: root.wheelRemainder = 0 }
-    function showNewest() {
-        // Start with the first recent cards visible from left to right,
-        // rather than wrapping the oldest entries into the initial view.
+    function restoreSelection() {
+        if (gallery.count === 0)
+            return
+        // The backend resolves the last successfully applied ID, with the
+        // daemon's current wallpaper as fallback. Browsing/cancelling saves nothing.
+        const chosen = selector.initialWallpaperId
+        for (let i = 0; i < gallery.count; ++i) {
+            if (selector.wallpapers[i].id === chosen) {
+                gallery.currentIndex = i
+                return
+            }
+        }
+        // First run, removed wallpaper, or filtered out: show the recent cards.
         gallery.currentIndex = Math.max(0, Math.min(gallery.count - 1,
                                                    Math.floor(gallery.pathItemCount / 2)))
     }
-    Component.onCompleted: showNewest()
+    Component.onCompleted: restoreSelection()
 
     PathView {
         id: gallery
@@ -163,7 +173,7 @@ Window {
 
     Connections {
         target: selector
-        function onWallpapersChanged() { root.showNewest() }
+        function onWallpapersChanged() { root.restoreSelection() }
         function onApplied() {
             root.appliedOnce = true
             if (selector.error.length === 0)

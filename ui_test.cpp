@@ -16,10 +16,12 @@ class FakeSelector : public QObject {
     Q_PROPERTY(bool busy MEMBER busy NOTIFY stateChanged)
     Q_PROPERTY(bool ready READ ready CONSTANT)
     Q_PROPERTY(QString error READ error CONSTANT)
+    Q_PROPERTY(QString initialWallpaperId MEMBER initialWallpaperId CONSTANT)
 public:
     QVariantList wallpapers;
     bool busy = false;
     QString appliedId;
+    QString initialWallpaperId;
     bool ready() const { return true; }
     QString error() const { return {}; }
     FakeSelector() {
@@ -42,9 +44,7 @@ class CarouselInputTest : public QObject {
     std::unique_ptr<QQmlApplicationEngine> engine;
     QQuickWindow *window = nullptr;
     QQuickItem *gallery = nullptr;
-private slots:
-    void init() {
-        selector = std::make_unique<FakeSelector>();
+    void openWindow(int expectedIndex) {
         engine = std::make_unique<QQmlApplicationEngine>();
         engine->rootContext()->setContextProperty("selector", selector.get());
         engine->load(QUrl("qrc:/Main.qml"));
@@ -56,8 +56,21 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(window));
         gallery = window->findChild<QQuickItem *>("gallery");
         QVERIFY(gallery);
-        QTRY_COMPARE(gallery->property("currentIndex").toInt(), 3);
-        QTRY_COMPARE(gallery->property("offset").toReal(), 9.0);
+        QTRY_COMPARE(gallery->property("currentIndex").toInt(), expectedIndex);
+        const int count = selector->wallpapers.size();
+        if (count > 0)
+            QTRY_COMPARE(gallery->property("offset").toReal(), double((count - expectedIndex) % count));
+    }
+    void reopenWindow(int expectedIndex) {
+        gallery = nullptr;
+        window = nullptr;
+        engine.reset();
+        openWindow(expectedIndex);
+    }
+private slots:
+    void init() {
+        selector = std::make_unique<FakeSelector>();
+        openWindow(3);
     }
     void cleanup() {
         gallery = nullptr;
@@ -131,6 +144,46 @@ private slots:
         QTRY_VERIFY(window->isActive());
         QTest::keyClick(window, Qt::Key_Escape);
         QTRY_VERIFY(!window->isVisible());
+        QVERIFY(selector->appliedId.isEmpty());
+    }
+    void opensCenteredOnRememberedWallpaper() {
+        selector->initialWallpaperId = "9";
+        reopenWindow(9);
+        QTest::qWait(300);
+        QCOMPARE(gallery->property("currentIndex").toInt(), 9);
+        QTest::keyClick(window, Qt::Key_Return);
+        QCOMPARE(selector->appliedId, QString("9"));
+    }
+    void newImportsDoNotChangeRememberedWallpaper() {
+        selector->initialWallpaperId = "9";
+        selector->wallpapers.prepend(QVariantMap{{"id", "new"}, {"title", "new"}, {"preview", ""}});
+        reopenWindow(10);
+        QTest::keyClick(window, Qt::Key_Return);
+        QCOMPARE(selector->appliedId, QString("9"));
+    }
+    void cancelledBrowsingKeepsRememberedWallpaper() {
+        selector->initialWallpaperId = "8";
+        reopenWindow(8);
+        QTest::wheelEvent(window, QPoint(900, 230), QPoint(0, -120));
+        QCOMPARE(gallery->property("currentIndex").toInt(), 9);
+        QTRY_VERIFY(window->isActive());
+        QTest::keyClick(window, Qt::Key_Escape);
+        QTRY_VERIFY(!window->isVisible());
+        QVERIFY(selector->appliedId.isEmpty());
+        reopenWindow(8);
+        QVERIFY(selector->appliedId.isEmpty());
+    }
+    void missingWallpaperFallsBackToRecent() {
+        selector->initialWallpaperId = "removed";
+        reopenWindow(3);
+        QVERIFY(selector->appliedId.isEmpty());
+    }
+    void emptyLibraryHasNoSelection() {
+        selector->initialWallpaperId = "9";
+        selector->wallpapers.clear();
+        reopenWindow(0); // PathView uses index 0 even when it has no current item.
+        QCOMPARE(gallery->property("count").toInt(), 0);
+        QTest::keyClick(window, Qt::Key_Return);
         QVERIFY(selector->appliedId.isEmpty());
     }
 };

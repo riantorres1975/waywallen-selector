@@ -15,6 +15,7 @@ int main() {
         unknown->AddVarint(12, 0); // Rotation interval.
         unknown->AddLengthDelimited(11, "sequential");
         unknown->AddLengthDelimited(20, std::string("\x08\x00\x10\x64", 4)); // Opaque renderer options.
+        unknown->AddLengthDelimited(31, std::string("\x08\x03", 2)); // 0.6 hidden-library visibility.
         original.mutable_transition()->set_duration_ms(500);
         auto changed = original;
         changed.mutable_transition()->set_kind(1);

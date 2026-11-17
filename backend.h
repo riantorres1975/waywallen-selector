@@ -19,6 +19,7 @@ class Backend : public QObject {
     Q_PROPERTY(bool busy READ busy NOTIFY stateChanged)
     Q_PROPERTY(bool previewOnly READ previewOnly CONSTANT)
     Q_PROPERTY(QString currentId READ currentId NOTIFY currentIdChanged)
+    Q_PROPERTY(QString initialWallpaperId READ initialWallpaperId CONSTANT)
 public:
     explicit Backend(bool previewOnly = false, QObject *parent = nullptr);
     QVariantList wallpapers() const { return m_filtered; }
@@ -31,6 +32,7 @@ public:
     bool busy() const { return m_busy; }
     bool previewOnly() const { return m_previewOnly; }
     QString currentId() const { return m_currentId; }
+    QString initialWallpaperId() const { return m_initialWallpaperId; }
     void setSearch(const QString &value);
     void setTargetIndex(int index);
     void preferScreen(const QString &model);
@@ -56,7 +58,7 @@ private:
     void enableAccent();
     void syncColors(const QString &id, std::function<void()> finished);
     QVariantList m_all, m_filtered, m_displays;
-    QString m_search, m_error, m_currentId, m_screenModel;
+    QString m_search, m_error, m_currentId, m_screenModel, m_initialWallpaperId;
     QWebSocket m_socket;
     QHash<quint64, Callback> m_callbacks;
     quint64 m_requestId = 0;

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "backend.h"
+#include "compatibility.h"
+#include "selection_state.h"
 #include <QDBusInterface>
 #include <QDBusReply>
 #include <QDBusVariant>
@@ -39,7 +41,8 @@ Backend::Backend(bool previewOnly, QObject *parent) : QObject(parent), m_preview
     QDBusReply<QDBusVariant> current = properties.call("Get", interface, "CurrentWallpaperId");
     if (current.isValid()) m_currentId = current.value().variant().toString();
     loadLibrary();
-    connectDaemon();
+    m_initialWallpaperId = SelectionState::initialWallpaperId(m_all, m_currentId, QSettings());
+    if (m_error.isEmpty()) connectDaemon();
 }
 
 void Backend::loadLibrary() {
@@ -51,9 +54,9 @@ void Backend::loadLibrary() {
         db.setConnectOptions("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=1500");
         if (!db.open()) { fail("No se pudo leer la biblioteca: " + db.lastError().text()); return; }
         QSqlQuery query(db);
-        if (!query.exec("SELECT i.id, i.display_name, i.type, i.path, i.preview_path, l.path "
-                        "FROM item i JOIN library l ON l.id=i.library_id "
-                        "WHERE i.hidden=0 ORDER BY i.create_at DESC, i.id DESC")) {
+        const QString sql = Compatibility::libraryQuery(db);
+        if (sql.isEmpty()) { fail("La biblioteca no tiene una fecha de incorporación compatible."); return; }
+        if (!query.exec(sql)) {
             fail("La biblioteca tiene un formato no compatible: " + query.lastError().text());
             return;
         }
@@ -128,8 +131,8 @@ void Backend::connectDaemon() {
     if (!port.isValid() || !version.isValid() || !port.value().variant().toUInt()) {
         fail("Abre Waywallen antes de usar el selector."); return;
     }
-    if (!version.value().variant().toString().startsWith("0.5.")) {
-        fail("Esta integración está comprobada para Waywallen 0.5.x. Usa su interfaz para esta versión."); return;
+    if (!Compatibility::supportedVersion(version.value().variant().toString())) {
+        fail("Esta integración admite Waywallen 0.5.x y 0.6.x. Usa su interfaz para esta versión."); return;
     }
     connect(&m_socket, &QWebSocket::binaryMessageReceived, this, &Backend::receive);
     connect(&m_socket, &QWebSocket::errorOccurred, this, [this] {
@@ -148,6 +151,7 @@ void Backend::connectDaemon() {
             if (!response.has_display_list()) { fail("Waywallen no devolvió sus monitores."); return; }
             QSet<QString> canvases;
             for (const auto &display : response.display_list().displays()) {
+                if (!Compatibility::desktopTarget(display)) continue;
                 const QString canvas = QString::fromStdString(display.canvas_id());
                 if (!canvas.isEmpty() && canvases.contains(canvas)) continue;
                 if (!canvas.isEmpty()) canvases.insert(canvas);
@@ -248,6 +252,8 @@ void Backend::apply(const QString &id, int transition, bool accent, bool appColo
             request(apply, [this, id, target, accent, appColors](const selectorwire::Response &response) {
                 if (!response.has_wallpaper_apply()) { fail("Waywallen no confirmó el cambio de fondo."); return; }
                 QSettings().setValue("targetKey", target["key"]);
+                QSettings preferences;
+                SelectionState::rememberAppliedWallpaper(preferences, id);
                 // Full palette sync owns the accent; do not race the native
                 // thumbnail-based provider against the generated scheme.
                 if (accent && !appColors) enableAccent();

@@ -21,6 +21,7 @@ como fondos instalables con el proyecto.
 
 - Miniaturas estáticas de tu biblioteca existente, sin iniciar nuevos renderizadores.
 - Fondos ordenados por fecha de incorporación: del más reciente al más antiguo.
+- Al abrir, centra el último fondo aplicado desde el selector, aunque importes fondos nuevos.
 - Navegación con teclado, rueda o arrastre; clic o Enter para aplicar.
 - Transición nativa de Waywallen y opción interna de acento automático de Plasma.
 - Paleta del wallpaper para KDE/Plasma, Dolphin/Kvantum, Kitty, Btop, Cava, bordes y Vesktop, con respaldo y restauración.
@@ -34,7 +35,7 @@ Este proyecto es un complemento independiente; **no reemplaza Waywallen**.
 ## Compatibilidad
 
 - Linux con KDE Plasma 6; comprobado en Wayland.
-- **Waywallen 0.5.x instalado mediante Flatpak** (`org.waywallen.waywallen`),
+- **Waywallen 0.5.x o 0.6.x instalado mediante Flatpak** (`org.waywallen.waywallen`),
   con el daemon y la integración del escritorio funcionando.
 - Biblioteca en `~/.var/app/org.waywallen.waywallen/data/waywallen/waywallen-v2.db`.
 - Qt **6.8 o superior**, KDE Frameworks 6, CMake 3.24+, compilador C++20 y Protobuf.
@@ -42,6 +43,8 @@ Este proyecto es un complemento independiente; **no reemplaza Waywallen**.
 La ruta de la biblioteca y el protocolo están adaptados a esa instalación de
 Waywallen. Otras versiones, instalaciones nativas y otros escritorios no están
 soportados por esta versión. Las entradas ocultas o cuyos archivos faltan se omiten.
+Se reconocen las fechas de incorporación de ambas versiones (`create_at` y `added_at`).
+Las superficies de bloqueo de pantalla no se ofrecen como destinos.
 
 ## Compilar e instalar
 
@@ -88,6 +91,11 @@ No reemplaces otro atajo si esa combinación ya está ocupada.
 La imagen elegida seguirá siendo un fondo animado cuando Waywallen lo reproduzca;
 solo las miniaturas del carrusel son estáticas. El tamaño de la franja se adapta
 a la pantalla, hasta 1800 × 460 píxeles lógicos.
+
+La posición se recuerda por el ID del último wallpaper aplicado correctamente,
+no por su número de tarjeta. Navegar y salir con Esc no cambia ese recuerdo.
+Si ya no está disponible, se centra el fondo actual de Waywallen; si tampoco está,
+se muestran los más recientes. Abrir el selector no vuelve a aplicar el wallpaper.
 
 ## Preferencias internas
 
@@ -180,7 +188,7 @@ La captura puede contener imágenes de tu biblioteca: revísala antes de compart
 
 La biblioteca SQLite se abre en **solo lectura**. El puerto de control del daemon
 se obtiene mediante D-Bus y las operaciones se envían por su WebSocket local.
-La interfaz se limita al protocolo de Waywallen 0.5.x.
+La interfaz se limita al subconjunto compatible del protocolo de Waywallen 0.5.x/0.6.x.
 
 Antes de ajustar la transición se consulta la configuración completa: los campos
 globales no modelados y las opciones de los plugins se preservan en protobuf.

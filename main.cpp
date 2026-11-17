@@ -98,6 +98,7 @@ int main(int argc, char **argv) {
             QTextStream(stdout) << QJsonDocument(QJsonObject{
                 {"wallpapers", backend.total()}, {"monitors", backend.displays().size()},
                 {"ready", backend.ready()}, {"error", backend.error()},
+                {"initialWallpaperId", backend.initialWallpaperId()},
                 {"firstWallpaperIds", firstIds}
             }).toJson();
             app.exit(backend.ready() ? 0 : 1);

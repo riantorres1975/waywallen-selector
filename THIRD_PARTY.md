@@ -4,6 +4,7 @@
 
 `protocol.proto` is a modified, reduced subset of the control protocol from
 [Waywallen v0.5.0](https://github.com/waywallen/waywallen/blob/v0.5.0/proto/control.proto),
+checked against [v0.6.0](https://github.com/waywallen/waywallen/blob/v0.6.0/proto/control.proto),
 licensed under GNU GPL version 3. Original work belongs to the Waywallen
 contributors; this project is an independent companion, not an official release.
 
@@ -13,6 +14,9 @@ Modifications dated 2026-11-04:
 - Global settings retain unmodelled fields through `UnknownFieldSet`.
 - Plugin-map entries are preserved as opaque wire-compatible payloads.
 - The protobuf package is renamed to `selectorwire`.
+
+Compatibility update dated 2026-11-16: display role (field 25) is retained to
+exclude lock-screen surfaces in both supported versions.
 
 The repository is distributed under GPL-3.0-only. See [LICENSE](LICENSE).
 
